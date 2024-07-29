@@ -1,0 +1,46 @@
+name: ECR Docker Image
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy' # Simulating Environments feature
+        required: true
+        type: choice
+        options:
+          - sandbox
+          - production
+      image-version:
+        description: "Docker Image Version"
+        type: string
+        default: 'latest'
+        required: true
+
+env:
+    AWS_REGION: 'ap-southeast-2'
+    AWS_ACCOUNT_ID: '123456789012'
+    REPOSITORY_NAME: 'demo-copperleaf-webapp-ecr-01'
+    IMAGE_VERSION: ${{ inputs.image-version }}
+
+jobs:
+  docker-ecr:
+    name: 'Docker build and push into ECR'
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: 'Checkout GitHub Actions'
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY}}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: 'Docker Build and Push'
+      run: |
+        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+        docker build -t $REPOSITORY_NAME .
+        docker tag $REPOSITORY_NAME:$IMAGE_VERSION $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_VERSION
+        docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_VERSION
